@@ -2,6 +2,7 @@ import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
+  base: '/CraftBlog/',
   title: "橘子不爱吃番茄酱的碗",
   description: "吃完饭就胡言乱语",
   themeConfig: {
