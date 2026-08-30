@@ -100,7 +100,8 @@ function cardStyle(k: number) {
   const shift = k * 16   // 每往外一层，横向多错开卡片宽度的 16%
   const scale = Math.max(0.5, 1 - Math.abs(k) * 0.17)  // 越往外越小
   return {
-    transform: `translateX(calc(-50% + ${shift}%)) scale(${scale})`,
+    // translateY(-50%) 配合 .card-pos 的 top:50% 实现垂直居中
+    transform: `translateX(calc(-50% + ${shift}%)) translateY(-50%) scale(${scale})`,
     zIndex: 40 - Math.abs(k) * 10
   }
 }
@@ -165,172 +166,188 @@ function sideStyle(k: number) {
 </template>
 
 <style scoped>
-/* scoped 表示这里写的样式只对本组件生效，不会污染其他组件 */
+/* scoped：Vue 的样式隔离机制。加上它，这里写的每个选择器都会被 Vue
+   自动补上一个 data-v-xxxx 标记，只对「本组件的元素」生效，
+   不会影响其它组件或页面。这是 Vue 里 CSS 和普通 CSS 最大的区别。 */
 
+/* ========== 最外层：整个横向文章列表所在的区块 ========== */
 .post-carousel {
-  margin: 0 auto;
-  max-width: 1240px;
-  padding: 0 24px 64px;
+  margin: 0 auto;        /* 左右外边距 auto：让这个区块在页面里水平居中 */
+  max-width: 1240px;     /* 最大宽度：屏幕再宽，内容也不超过 1240px */
+  padding: 0 24px 80px;  /* 内边距：上 0 / 左右 24px / 下 80px（给下方按钮留空间） */
 }
 
-/* 书架区域：相对定位，里面的卡片和箭头都以此为准 */
+/* ========== 书架区域：所有卡片和箭头的定位参照 ========== */
 .book {
-  position: relative;
-  height: 320px;
-  max-width: 1160px;
-  margin: 0 auto;
+  position: relative;   /* 相对定位：成为内部「绝对定位元素」的参照系 */
+  height: 480px;        /* 固定高度：卡片垂直居中所用的空间 */
+  max-width: 1160px;    /* 最大宽度：比外层窄一点，两侧留白 */
+  margin: 0 auto;       /* 水平居中 */
 }
 
-/* 卡片定位层：负责居中（left:50% + translateX(-50%)）和前后层次。
-   transform-origin: bottom center —— 缩放时底部不动，让两侧的书像立在书架上一样底对齐。 */
+/* ========== 卡片定位层：决定「每张卡片放在书架的哪个位置」 ==========
+   top:50% + translateY(-50%)  → 垂直居中
+   left:50% + translateX(-50%) → 水平居中（-50% 由 JS 的 cardStyle() 算）
+   transform-origin: center center → 缩放时以卡片中心为基准，
+   所以两侧小卡和中间大卡是「中心对齐」，而不是底边对齐。 */
 .card-pos {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: min(660px, 62vw);
-  height: 280px;
-  transform-origin: bottom center;
-  transition: transform 0.4s ease;
+  position: absolute;    /* 绝对定位：脱离文档流，位置由 top/left 决定，相对 .book 定位 */
+  top: 50%;              /* 上边线先放到 .book 垂直中点（配合 translateY(-50%) 才是真居中） */
+  left: 50%;             /* 左边线先放到 .book 水平中点（配合 translateX(-50%) 才是真居中） */
+  width: min(720px, 68vw); /* 宽度 = min(720px, 屏幕宽 68%)：窄屏时自动缩小 */
+  height: 320px;         /* 卡片高度固定 320px */
+  transform-origin: center center; /* 缩放时的基准点：卡片正中心 */
+  transition: transform 0.4s ease; /* 位移/缩放变化时 0.4 秒平滑过渡，翻页不突兀 */
 }
 
-/* 卡片本体：填满定位层，内容样式在这里 */
+/* ========== 卡片本体：卡片长什么样 ========== */
 .card {
-  width: 100%;
-  height: 100%;
-  padding: 24px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 12px;
-  background: var(--vp-c-bg-soft);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  /* 给 transform / opacity 加过渡：翻页动画和错位移动才平滑 */
-  transition: transform 0.4s ease, opacity 0.4s ease;
+  width: 100%;           /* 宽度占满 .card-pos */
+  height: 100%;          /* 高度占满 .card-pos */
+  padding: 24px;         /* 内边距：文字和卡片边缘之间留 24px 空 */
+  border: 1px solid var(--vp-c-divider); /* 1px 实线描边，颜色用主题变量（分隔线色） */
+  border-radius: 12px;   /* 圆角 12px：把四个直角变圆 */
+  background: var(--vp-c-bg-soft); /* 背景色用主题变量（柔和底色，深/浅色模式自动适配） */
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06); /* 阴影：下移4px/模糊14px/6%黑，制造悬浮感 */
+  transition: transform 0.4s ease, opacity 0.4s ease; /* 位移和透明度都平滑过渡 */
 }
 
-/* 翻页进出场动画（配合 <Transition name="page">）。
-   外层 .card-pos 只做淡入淡出（opacity 没有被内联样式占用，能生效）；
-   内层 .card 负责「翻开」的上下位移。 */
+/* ========== 翻页进出场动画（配合模板里的 <Transition name="page">）==========
+   Vue 的 <Transition> 在元素进入/离开时自动加这几类 class：
+   -enter-from / -leave-to   → 动画「开始/结束」时的样子
+   -enter-active / -leave-active → 动画进行中要过渡哪些属性
+   外层 .card-pos 只做淡入淡出（opacity），内层 .card 负责上下位移（translateY）。 */
 .page-enter-active,
 .page-leave-active {
-  transition: opacity 0.4s ease;
+  transition: opacity 0.4s ease; /* 过渡目标是透明度，0.4 秒平滑变化 */
 }
 .page-enter-from,
 .page-leave-to {
-  opacity: 0;
+  opacity: 0;                    /* 开始进入时 / 离开结束时：完全透明 */
 }
 .page-enter-from .card {
-  transform: translateY(24px);
+  transform: translateY(24px);   /* 进入时卡片从下方 24px 处开始（像翻开出来） */
 }
 .page-leave-to .card {
-  transform: translateY(-24px);
+  transform: translateY(-24px);  /* 离开时卡片向上 24px 移动（像合上） */
 }
 
+/* ========== 卡片里的文章标题 ========== */
 .card-title {
-  margin: 0 0 8px;
-  font-size: 22px;
-  font-weight: 600;
+  margin: 0 0 8px;   /* 外边距：上 0 / 左右 0 / 下 8px（和日期隔开一点） */
+  font-size: 22px;   /* 字号 22px（比正文大，是标题） */
+  font-weight: 600;  /* 字重 600（半粗体，介于正常 400 和粗体 700 之间） */
 }
 
-/* 标题本身是跳转链接：去掉默认下划线和颜色，悬停变主题色 */
+/* 标题本身是一个跳转链接 <a>：去掉链接默认的蓝色下划线，悬停时变主题色 */
 .card-title a {
-  color: var(--vp-c-text-1);
-  text-decoration: none;
-  transition: color 0.2s;
+  color: var(--vp-c-text-1);   /* 文字色用主题变量（主文字色） */
+  text-decoration: none;       /* 去掉下划线（链接默认带下划线） */
+  transition: color 0.2s;      /* 颜色变化 0.2 秒平滑过渡 */
 }
 .card-title a:hover {
-  color: var(--vp-c-brand);
+  color: var(--vp-c-brand);    /* 鼠标悬停时变成主题强调色 */
 }
 
+/* ========== 文章日期 ========== */
 .card-date {
-  font-size: 13px;
-  color: var(--vp-c-text-2);
+  font-size: 13px;             /* 小号字 */
+  color: var(--vp-c-text-2);   /* 次要文字色（比正文浅一点，弱化存在感） */
 }
 
-/* 文章的缩小版预览区：限高 + 超出隐藏 + 底部渐隐，暗示后面还有内容 */
+/* ========== 文章缩小版预览区 ========== */
 .card-content {
-  margin-top: 12px;
-  max-height: 160px;
-  overflow: hidden;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--vp-c-text-2);
-  /* 底部渐隐（渐透明），比硬生生截断更自然。
-     -webkit-mask-image 是旧浏览器前缀，mask-image 是标准写法 */
+  margin-top: 12px;   /* 和上面的日期隔开 12px */
+  max-height: 200px;  /* 最多显示 200px 高，超出部分不显示（防止整篇文章都塞进卡片） */
+  overflow: hidden;   /* 超出 max-height 的内容裁掉（不出现滚动条） */
+  font-size: 13px;    /* 小号字 */
+  line-height: 1.6;   /* 行高 1.6 倍：行与行之间更舒展 */
+  color: var(--vp-c-text-2); /* 次要文字色 */
+  /* 底部渐隐（渐透明）：比硬生生截断更自然，暗示「下面还有内容」。
+     mask-image 用一张「渐变图」盖在元素上，按渐变的透明度把内容遮住/露出。
+     linear-gradient(to bottom, #000 60%, transparent 100%) 表示从上到下：
+     前 60% 完全不透明（黑色 #000 → 完全露出），后 40% 逐渐变透明 → 内容淡出。
+     -webkit-mask-image 是旧浏览器的前缀写法，mask-image 是标准写法，两个都写为了兼容。 */
   -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
 }
 
-/* v-html 注入的内容不带本组件的 scope 属性，普通 scoped 选择器命中不了，
-   必须用 :deep() 才能给里面的 h1/p/pre 等元素套样式。
-   这里把字号都改小，让卡片看起来像「文章的缩小版」。 */
+/* ========== v-html 注入的文章内容（h1/p/pre/img 等）==========
+   这些内容不是本组件的标签，身上没有 data-v 标记，普通 scoped 选择器打不到，
+   必须用 :deep() 穿透进内部才能给它们套样式。
+   这里统一把字号改小，让卡片看起来像「文章的缩小版」。 */
 .card-content :deep(h1),
 .card-content :deep(h2),
 .card-content :deep(h3),
 .card-content :deep(h4) {
-  margin: 10px 0 4px;
-  font-size: 15px;
-  line-height: 1.4;
+  margin: 10px 0 4px;  /* 标题上下留白：上 10px / 下 4px */
+  font-size: 15px;     /* 小标题字号压到 15px */
+  line-height: 1.4;    /* 行高 1.4 倍 */
 }
-/* 文章页的第一个一级标题通常和卡片标题重复，这里隐藏它，避免出现两遍 */
+/* 文章里的第一个一级标题（# 大标题）通常和卡片自己的标题重复，直接隐藏，避免出现两遍 */
 .card-content :deep(h1) {
-  display: none;
+  display: none;       /* 不显示：元素还在 DOM 里，但视觉上消失、不占空间 */
 }
 .card-content :deep(p) {
-  margin: 4px 0;
+  margin: 4px 0;       /* 段落上下留白 4px（缩小版里段落挤一点，更紧凑） */
 }
 .card-content :deep(a) {
-  color: var(--vp-c-brand);
+  color: var(--vp-c-brand); /* 文章里的链接统一用主题色 */
 }
 .card-content :deep(img) {
-  max-width: 100%;
+  max-width: 100%;     /* 图片最大宽度 = 卡片宽度，防止大图把卡片撑破 */
 }
 .card-content :deep(pre) {
-  margin: 8px 0;
-  font-size: 11px;
-  overflow: hidden;
+  margin: 8px 0;       /* 代码块上下留白 */
+  font-size: 11px;     /* 代码字再小一号 */
+  overflow: hidden;    /* 超长的代码行裁掉，不出现横向滚动条 */
 }
 .card-content :deep(code) {
-  font-size: 11px;
+  font-size: 11px;     /* 行内代码也用小字号 */
 }
 .card-content :deep(ul),
 .card-content :deep(ol) {
-  margin: 4px 0;
-  padding-left: 18px;
+  margin: 4px 0;          /* 列表上下留白 */
+  padding-left: 18px;     /* 左侧缩进 18px：给项目符号（圆点/数字）留出位置 */
 }
 
-/* 两侧的「书」：底色更深、只显示标题、不拦截鼠标 */
+/* ========== 两侧的「书」（非当前文章的小卡片）==========
+   底色更深、只显示标题、不拦截鼠标（点了没反应，翻页靠箭头）。 */
 .peek {
-  background: var(--vp-c-bg-elv);
-  pointer-events: none;
+  background: var(--vp-c-bg-elv); /* 更深的背景色（主题变量，浮层色） */
+  pointer-events: none;  /* 鼠标事件穿透：让这个元素「点不到」（不挡后面的东西） */
 }
 .peek-title {
-  font-size: 16px;
+  font-size: 16px;       /* 侧卡标题比中间卡小 */
 }
 
-/* 左右箭头按钮：垂直居中放在书架最外侧（卡片区域之外），互不重叠 */
+/* ========== 左右箭头按钮（上一页/下一页）==========
+   垂直居中放在书架最外侧（卡片区域之外），互不重叠。 */
 .nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 50;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 50%;
-  background: var(--vp-c-bg);
-  color: var(--vp-c-text-1);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, opacity 0.2s;
+  position: absolute;    /* 绝对定位：相对 .book 定位 */
+  top: 50%;              /* 上边线先放到 .book 垂直中点 */
+  transform: translateY(-50%); /* 再向上移自身一半高度 → 真正的垂直居中 */
+  z-index: 50;           /* 层级：压在卡片上面，不被卡片盖住 */
+  width: 40px;           /* 按钮宽 40px */
+  height: 40px;          /* 按钮高 40px（宽高相等 → 正方形） */
+  border: 1px solid var(--vp-c-divider); /* 1px 描边 */
+  border-radius: 50%;    /* 圆角 50%：正方形加 50% 圆角 → 正圆 */
+  background: var(--vp-c-bg);   /* 背景用页面底色 */
+  color: var(--vp-c-text-1);    /* 箭头字符用主文字色 */
+  font-size: 22px;       /* 箭头符号的字号 */
+  line-height: 1;        /* 行高 1：防止箭头字符被行高挤出圆形按钮 */
+  cursor: pointer;       /* 鼠标悬停变成手型（暗示可以点击） */
+  transition: border-color 0.2s, color 0.2s, opacity 0.2s; /* 悬停变色时平滑过渡 */
 }
-.nav.prev { left: 0; }
-.nav.next { right: 0; }
+.nav.prev { left: 0; }   /* 上一个按钮：贴在 .book 最左边 */
+.nav.next { right: 0; }  /* 下一个按钮：贴在 .book 最右边 */
 .nav:hover {
-  border-color: var(--vp-c-brand);
-  color: var(--vp-c-brand);
+  border-color: var(--vp-c-brand); /* 悬停：边框变主题色 */
+  color: var(--vp-c-brand);        /* 悬停：箭头变主题色 */
 }
 
+/* ========== 没有文章时的提示文字 ========== */
 .empty {
-  color: var(--vp-c-text-2);
+  color: var(--vp-c-text-2); /* 次要文字色（浅一点，弱提示） */
 }
 </style>

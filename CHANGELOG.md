@@ -29,6 +29,13 @@
   - 构建时 VitePress 自动把图片拷到产物 `assets/` 并加上 `/CraftBlog/` 前缀（实测 `<img src="/CraftBlog/assets/test-image.xxx.png">`），图片在 `/CraftBlog/` 子路径下也能正常显示
 - 测试图：`docs/images/test-image.png`（600×400 渐变图，脚本生成）；已插入 `docs/vitepress-githubPage.md` 演示
 
+### 修复首页卡片预览里的图片不显示
+
+- 现象：文章正文有图片时，首页书架卡片的文章预览里，图片显示不出来（破图）
+  - 原因：文章里图片用的是相对路径（如 `./images/xxx.png`），相对路径是「相对于文章页所在位置」的，文章页能正常显示；但首页卡片用 `v-html` 直接把文章 HTML 塞进首页，浏览器拿首页地址去解析相对路径，找不到文件（构建产物里图片被 VitePress 打到了带哈希的 `assets/` 目录），于是 404
+  - 手段：在 `theme/posts.data.ts` 新增 `fixImagePaths()`，把文章 HTML 里以 `./` / `../` 开头的图片路径重写成带 base 前缀的绝对路径（如 `/CraftBlog/images/xxx.png`），`html` 和 `excerpt` 两个字段都处理；在 `config.mts` 新增 `buildEnd` 钩子，构建完成后把 `docs/images/` 原样复制到 `dist/images/`，让重写后的路径能真正访问到图片文件
+- 验证：`docs:build` 产物里 `dist/images/` 含全部图片，首页数据里的图片路径已变为 `/CraftBlog/images/xxx.png`；`docs:preview` 与 `docs:dev` 下图片 URL 均返回 200；文章详情页不受影响（仍走哈希后的 `assets/` 路径）
+
 ### 首页横向文章列表（书架式卡片）
 
 - **移除默认首页的 features 三栏占位卡片**（原会占掉空间、把横向列表挤到屏幕外）

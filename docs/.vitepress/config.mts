@@ -48,6 +48,28 @@ export default defineConfig({
   // 站点描述：注入到 <meta name="description">，用于 SEO 和分享摘要
   description: "吃完饭就胡言乱语",
 
+  // buildEnd —— VitePress 在「构建完成、dist 写完后」自动调用的钩子。
+  // 作用：把 docs/images 这个图片文件夹原样复制到构建产物里。
+  // 为什么需要这一步：
+  //   文章正文里引用图片用的是相对路径 ./images/x.png，构建时 VitePress
+  //   会把它们打成带哈希的 assets/xxx.png，只服务文章页自己。
+  //   而首页卡片预览（posts.data.ts 里 fixImagePaths 处理后）引用的是
+  //   /CraftBlog/images/x.png 这个路径，构建产物里必须真的存在 images 文件夹，
+  //   图片才能显示。这里就用系统命令把图片复制过去。
+  //   以后新增图片仍放进 docs/images/ 即可，构建时会自动带上。
+  async buildEnd(siteConfig) {
+    // 图片源码目录：项目根目录 + docs/images
+    const imagesSrc = path.resolve(process.cwd(), 'docs/images')
+    // 复制目标：构建产物目录 + images（siteConfig.outDir 就是 dist 目录）
+    const imagesDest = path.join(siteConfig.outDir, 'images')
+
+    // 有的项目可能还没有 images 文件夹，先判断存在再复制，避免报错
+    if (fs.existsSync(imagesSrc)) {
+      // fs.cpSync：Node 内置的文件夹复制命令，recursive:true 表示连同子文件夹一起复制
+      fs.cpSync(imagesSrc, imagesDest, { recursive: true })
+    }
+  },
+
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
 

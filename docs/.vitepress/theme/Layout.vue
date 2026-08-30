@@ -35,21 +35,28 @@ const { Layout } = DefaultTheme
   这里把默认的那份隐藏掉，避免页面上出现两套按钮。
 -->
 <style>
+/* .VPHero .actions —— 默认主题 hero 区块里装按钮的那个容器。
+   display: none → 直接不显示。因为按钮已经由 HeroActions 组件
+   挪到下方横向列表之后了，这一份留着就会和它重复。
+   注意这个选择器没有 scoped，能命中默认主题组件内部的元素。 */
 .VPHero .actions {
   display: none;
 }
 
-/* 列表圆点颜色（模仿 Typora：缩进后的圆点变浅）：
-   markdown 语法没有「给圆点改颜色」的写法，
-   圆点由浏览器按 CSS 的 list-style 画出来，颜色默认继承文字颜色。
-   第一级圆点用正常文字色；嵌套（缩进）的圆点用浅色，和 Typora 一样能看出层级。 */
+/* 列表圆点颜色（模仿 Typora：缩进后的圆点变浅）。
+   ::marker 是「项目符号（圆点/数字）」本身，直接对它设颜色。
+   .vp-doc 是 VitePress 渲染 markdown 正文的容器类名。
+   第一级圆点用正常文字色 var(--vp-c-text-1)； */
 .vp-doc ul > li::marker,
 .vp-doc ol > li::marker {
-  color: var(--vp-c-text-1);
+  color: var(--vp-c-text-1);   /* 主文字色（正常黑/白） */
 }
 
+/* 嵌套（缩进）层级再深的列表，圆点用更浅的颜色 var(--vp-c-text-3)，
+   和 Typora 一样能看出层级。选择器写法：
+   li > ul > li —— 一个 li 里再套一个 ul/ol，里面再套的 li 就是「二级圆点」 */
 .vp-doc li > ul > li::marker,
 .vp-doc li > ol > li::marker {
-  color: var(--vp-c-text-3);
+  color: var(--vp-c-text-3);   /* 次要文字色（比主文字色浅） */
 }
 </style>
