@@ -38,4 +38,18 @@ const { Layout } = DefaultTheme
 .VPHero .actions {
   display: none;
 }
+
+/* 列表圆点颜色（模仿 Typora：缩进后的圆点变浅）：
+   markdown 语法没有「给圆点改颜色」的写法，
+   圆点由浏览器按 CSS 的 list-style 画出来，颜色默认继承文字颜色。
+   第一级圆点用正常文字色；嵌套（缩进）的圆点用浅色，和 Typora 一样能看出层级。 */
+.vp-doc ul > li::marker,
+.vp-doc ol > li::marker {
+  color: var(--vp-c-text-1);
+}
+
+.vp-doc li > ul > li::marker,
+.vp-doc li > ol > li::marker {
+  color: var(--vp-c-text-3);
+}
 </style>

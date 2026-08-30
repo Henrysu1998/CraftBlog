@@ -22,6 +22,13 @@
 - 安装 `@types/node`（开发依赖）：让 `config.mts` 里 `import fs from 'node:fs'` 不再报编辑器类型错误
 - 局限：目前只扫描 `docs/` 顶层，不递归子目录；以后文章多了要分目录，再扩展成按目录分组
 
+### 文章插图验证（相对路径自动加 base 前缀）
+
+- 确认 md 里可以插入图片并随 GitHub Pages 一起上线
+  - 手段：新建 `docs/images/` 文件夹放图片，md 里用相对路径引用 `![说明](./images/xxx.png)`
+  - 构建时 VitePress 自动把图片拷到产物 `assets/` 并加上 `/CraftBlog/` 前缀（实测 `<img src="/CraftBlog/assets/test-image.xxx.png">`），图片在 `/CraftBlog/` 子路径下也能正常显示
+- 测试图：`docs/images/test-image.png`（600×400 渐变图，脚本生成）；已插入 `docs/vitepress-githubPage.md` 演示
+
 ### 首页横向文章列表（书架式卡片）
 
 - **移除默认首页的 features 三栏占位卡片**（原会占掉空间、把横向列表挤到屏幕外）
