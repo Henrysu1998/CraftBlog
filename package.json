@@ -1,6 +1,9 @@
 {
+  "type": "module",
   "devDependencies": {
-    "vitepress": "2.0.0-alpha.19"
+    "@types/node": "^26.4.0",
+    "vitepress": "2.0.0-alpha.19",
+    "vue": "3.5.42"
   },
   "scripts": {
     "docs:dev": "vitepress dev docs",

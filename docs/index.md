@@ -7,11 +7,11 @@ layout: home
 # —— 顶部主视觉区（Hero）——
 hero:
   # 主标题（大字号，显示在页面最上方）
-  name: "橘子不爱吃番茄酱的碗"
+  name: "饱餐后的胡言乱语"
   # 副标题（紧跟主标题下方，字号次之）
   text: ""
   # 标语/描述（hero 底部的灰色小字）
-  tagline: "吃完饭就胡言乱语"
+  tagline: ""
   # 按钮区（可放多个按钮）
   actions:
     - theme: brand        # brand 主题：实心主色按钮
@@ -21,14 +21,9 @@ hero:
       text: API Examples
       link: /api-examples
 
-# —— 特性展示区（Features）——
-# 首页下半部分的三栏卡片，每项一个 title + details
-features:
-  - title: Feature A     # 卡片标题
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit   # 卡片描述
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+# 注意：这里故意不写 features 配置。
+# 默认首页模板会在 hero 下方渲染 features 三栏卡片，会占掉一大块空间、
+# 把下方自定义的横向滑动文章列表（PostCarousel）挤到屏幕外。
+# 去掉 features 后，横向文章列表会紧跟 hero 显示。
 ---
 
