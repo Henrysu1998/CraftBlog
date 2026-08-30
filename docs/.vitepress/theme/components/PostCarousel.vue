@@ -168,9 +168,9 @@ function sideStyle(k: number) {
 /* scoped 表示这里写的样式只对本组件生效，不会污染其他组件 */
 
 .post-carousel {
-  margin: 48px auto 0;   /* 48px 是顶部与 hero 的距离，改大数值让它往下挪 */
+  margin: 0 auto;
   max-width: 1240px;
-  padding: 0 24px 48px;
+  padding: 0 24px 64px;
 }
 
 /* 书架区域：相对定位，里面的卡片和箭头都以此为准 */
