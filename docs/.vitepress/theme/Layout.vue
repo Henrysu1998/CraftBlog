@@ -3,8 +3,10 @@
 import DefaultTheme from 'vitepress/theme'
 // 引入我们要插入首页的横向文章列表组件。
 import PostCarousel from './components/PostCarousel.vue'
-// 引入把 hero 按钮挪到横向列表下方的按钮组件。
-import HeroActions from './components/HeroActions.vue'
+// 引入首页底部的分类按钮组件（书架下方那一排可点击的分类按钮）。
+import CategoryTags from './components/CategoryTags.vue'
+// 引入浏览量埋点组件（不渲染内容，只负责给文章页计数）。
+import ViewTracker from './components/ViewTracker.vue'
 
 // 从默认主题里解构出 Layout（默认主题的页面骨架组件）。
 // 之后我们「包一层」它：保留它原有的导航栏、侧边栏、页脚等，
@@ -22,27 +24,26 @@ const { Layout } = DefaultTheme
     所以我们的文章列表和按钮都会出现在首页 features 卡片的下方。
   -->
   <Layout>
-    <template #home-features-after>
+    <!-- layout-top 是默认 Layout 最外层的插槽，任何页面（首页/文章页/分类页）都会渲染。
+         ViewTracker 不显示内容，放在这里负责给文章页埋点计浏览数。 -->
+    <template #layout-top>
+      <ViewTracker />
+    </template>
+
+    <template #home-features-before>
       <PostCarousel />
-      <HeroActions />
+      <!-- 分类按钮：显示在书架下方，点击进入对应分类页 -->
+      <CategoryTags />
     </template>
   </Layout>
 </template>
 
 <!--
   全局样式（不加 scoped，才能作用到默认主题的组件上）：
-  默认 hero 里的 action 按钮区已经通过 HeroActions 挪到下方横向列表之后，
-  这里把默认的那份隐藏掉，避免页面上出现两套按钮。
+  hero.actions 配置已经从 index.md 里删除，首页不再显示那两颗按钮，
+  所以这里也不再需要隐藏默认 hero 的按钮区。
 -->
 <style>
-/* .VPHero .actions —— 默认主题 hero 区块里装按钮的那个容器。
-   display: none → 直接不显示。因为按钮已经由 HeroActions 组件
-   挪到下方横向列表之后了，这一份留着就会和它重复。
-   注意这个选择器没有 scoped，能命中默认主题组件内部的元素。 */
-.VPHero .actions {
-  display: none;
-}
-
 /* 列表圆点颜色（模仿 Typora：缩进后的圆点变浅）。
    ::marker 是「项目符号（圆点/数字）」本身，直接对它设颜色。
    .vp-doc 是 VitePress 渲染 markdown 正文的容器类名。

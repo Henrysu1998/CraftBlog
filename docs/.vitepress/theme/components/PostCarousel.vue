@@ -12,10 +12,11 @@
 
 <script setup lang="ts">
 // <script setup> 是 Vue 3 的语法糖：逻辑直接写在这里，不用手动 return 给模板。
-// 这里只用到两个 Vue 工具：
-//   ref      —— 创建「响应式数据」，改变它会自动重新渲染界面
-//   computed —— 创建「由其它数据算出来」的数据，依赖一变它自动跟着变
-import { computed, ref } from 'vue'
+// 这里只用到了几个 Vue 工具：
+//   ref       —— 创建「响应式数据」，改变它会自动重新渲染界面
+//   computed  —— 创建「由其它数据算出来」的数据，依赖一变它自动跟着变
+//   onMounted —— 组件挂载到页面后执行一次（浏览器环境才会执行）
+import { computed, onMounted, ref } from 'vue'
 
 // withBase 是 VitePress 提供的工具函数：给路径补上站点的 base 前缀。
 // 我们的站点部署在 /CraftBlog/ 下，而数据加载器返回的 url 是不带前缀的
@@ -31,6 +32,10 @@ import { withBase } from 'vitepress'
 // @ts-expect-error VitePress 构建时注入 data 导出，编辑器静态检查看不到
 import { data as posts } from '../posts.data'
 
+// 浏览量统计工具：查询「浏览量最高的前 n 篇」文章（路径 + 浏览量数字）。
+// 书架展示的就是这份 top-K，卡片右上角还要显示每篇的浏览量。
+import { fetchTopPosts } from '../supabase'
+
 // interface 是 TS 的「类型定义」：描述一个文章对象长什么样。
 // 让后面用 items 时，编辑器能提示有哪些字段、类型是什么。
 interface Post {
@@ -41,37 +46,59 @@ interface Post {
   html: string         // 文章渲染后的完整 HTML，用于卡片里的缩小版预览
 }
 
-// posts 是数据加载器返回的结果，TS 不知道它的具体结构，
-// 这里用「类型断言」（as）告诉 TS：把它当作 Post[]（Post 数组）来用。
-const items = posts as unknown as Post[]
+// RankedPost：被书架选中、排在 top-K 里的文章。
+// 在 Post 的基础上多带一个 count（浏览量数字），角标就显示它。
+// 语法：interface A extends B —— A 继承 B 的所有字段，再额外加自己的。
+interface RankedPost extends Post {
+  count: number  // 浏览量
+}
 
-// current：当前在中间展示的文章在 items 里的下标（第几本）。
+// posts 是数据加载器返回的「全部文章」。书架不再直接展示全部，
+// 而是只展示其中「浏览量排名前 K」的那些。所以这里把全部文章当「候选池」用，
+// 需要时按 url 查回文章对象。
+// 这里用「类型断言」（as）告诉 TS：把它当作 Post[]（Post 数组）来用。
+const allPosts = posts as unknown as Post[]
+
+// ranked：书架实际展示的文章，按浏览量从高到低排序，最多 K 篇。
+// 每篇都带着 count（浏览量），卡片角标要用。元素类型是 RankedPost（Post + count）。
+// 初始是空数组，等 onMounted 里从 Supabase 拉取后再填进去（响应式，填了界面自动更新）。
+const ranked = ref<RankedPost[]>([])
+
+// loading：是否还在从 Supabase 拉取 top-K。拉取期间显示「加载中…」。
+const loading = ref(true)
+
+// current：当前在中间展示的文章在 ranked 里的下标（第几本）。
 const current = ref(0)
 
 // sideCount：当前卡片左右两侧各露出几张「书」。想露出更多就调大这个数字。
 const sideCount = 2
 
-// total：文章总数。visibleCount：最多同时显示的卡片数。
-// 环形模式下如果文章总数比 2*sideCount+1 还少，就少显示几张，
-// 避免同一篇文章在书架里出现两次。
-const total = items.length
-const visibleCount = Math.min(2 * sideCount + 1, total)
+// total：书架实际展示的文章数（取回来的 top-K 数量）。
+// visibleCount：一屏最多同时显示的卡片数（中间 1 + 左右各 sideCount 张）。
+// 都改成 computed：ranked 一填充，这些数会自动跟着算，界面自动更新。
+// 环形模式下如果数量比 2*sideCount+1 还少，就少显示几张，避免文章重复出现。
+const total = computed(() => ranked.value.length)
+const visibleCount = computed(() => Math.min(2 * sideCount + 1, total.value))
 
 // stack：把 current 和它左右若干个邻居一起算出来，构成「书架」。
 // 用取模（% total）实现环形：跨过首尾时会自动绕到另一边，
 // 所以翻到最后一篇后继续点右箭头，会回到第一篇。
 // 每一项带一个 k：k=0 是中间当前的卡片；k 为负在左边，为正在右边，
 // 绝对值越大离得越远、越往后退。
-// 用 computed 包裹：current 变化时这里自动重新算，界面跟着更新。
+// 用 computed 包裹：current 或 ranked 变化时这里自动重新算，界面跟着更新。
 const stack = computed(() => {
   const list: { post: Post; k: number }[] = []
-  for (let i = 0; i < visibleCount; i++) {
+  const vc = visibleCount.value  // 一屏要显示的数量
+  const t = total.value          // 取回来的 top-K 数量
+  if (t === 0) return list       // 没有文章：直接返回空书架（避免 0 作除数报错）
+
+  for (let i = 0; i < vc; i++) {
     // 把下标对齐到中间：让第 0 个槽位对应最中间那张（k=0）
-    const k = i - Math.floor(visibleCount / 2)
-    // 取模实现环形：% total 后一定落在合法范围内；因为 visibleCount ≤ total，
+    const k = i - Math.floor(vc / 2)
+    // 取模实现环形：% t 后一定落在合法范围内；因为 vc ≤ t，
     // 这些下标各不相同，不会出现重复文章。
-    const idx = (current.value + k + total) % total
-    list.push({ post: items[idx], k })
+    const idx = (current.value + k + t) % t
+    list.push({ post: ranked.value[idx], k })
   }
   return list
 })
@@ -84,13 +111,60 @@ const side = computed(() => stack.value.filter((item) => item.k !== 0))
 
 // 往前翻一页：环形，取模绕回。到第一篇再点会跳到最后一篇。
 function prev() {
-  if (total) current.value = (current.value - 1 + total) % total
+  if (total.value) current.value = (current.value - 1 + total.value) % total.value
 }
 
 // 往后翻一页：环形，取模绕回。到最后一篇再点会跳回第一篇。
 function next() {
-  if (total) current.value = (current.value + 1) % total
+  if (total.value) current.value = (current.value + 1) % total.value
 }
+
+// formatCount：把浏览量数字格式化成好读的样子，显示在卡片角标里。
+// 约定：k = 一千，m = 一百万。
+//   不到 1000        ：直接显示数字（比如 328 → "328"）
+//   1000 ~ 999999    ：换算成 k，保留 1 位小数，再去掉多余的 ".0"（1250 → "1.3k"）
+//   1000000 及以上   ：换算成 m（1234567 → "1.2m"，1000000 → "1m"）
+function formatCount(n: number): string {
+  if (n >= 1000000) {
+    return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'm'
+  }
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  }
+  return String(n)
+}
+
+// 页面挂载后（只在浏览器执行），从 Supabase 拉取「浏览量最高的前 K 篇」文章。
+// K = 一屏最多能摆的数量（中间 1 + 左右各 sideCount 张），但不超过文章总数。
+// 拉回来的是路径列表，再映射回全部文章里找对应文章；找不到的（文章已删）丢弃。
+// 书架只展示这份 top-K，排第一（下标 0）的就是浏览量最高的那篇。
+onMounted(async () => {
+  // 一屏最多摆几张，就取前几名
+  const limit = Math.min(2 * sideCount + 1, allPosts.length)
+  // 没有文章（理论不会发生）：退出加载态，显示「暂无文章」
+  if (limit <= 0) {
+    loading.value = false
+    return
+  }
+
+  // 从 Supabase 拿 top-K 的文章（路径 + 浏览量，按浏览量从高到低排好序）
+  const top = await fetchTopPosts(limit)
+
+  // 建 url → 文章 的对照表，把路径映射回文章对象
+  const byUrl = new Map<string, Post>(allPosts.map((p) => [p.url, p]))
+
+  // 逐篇处理：能找到对应文章就把 count 挂上去组成 RankedPost；找不到的（文章已删）丢弃。
+  // 用 ? : 表达式：找到返回带 count 的文章，没找到返回 null，最后统一过滤掉 null。
+  ranked.value = top
+    .map(({ url, count }) => {
+      const post = byUrl.get(url)
+      return post ? { ...post, count } : null
+    })
+    .filter((post): post is RankedPost => post !== null)
+
+  // 拉取结束，无论成功失败都退出加载态（失败时 ranked 为空 → 显示「暂无文章」）
+  loading.value = false
+})
 
 // cardStyle(k)：计算中间当前卡片（k=0）的定位样式。
 // 用百分比做横向偏移，能跟着卡片宽度自适应。
@@ -118,8 +192,10 @@ function sideStyle(k: number) {
 
 <template>
   <section class="post-carousel">
-    <!-- 没有文章时显示的占位提示 -->
-    <p v-if="!front" class="empty">暂无文章</p>
+    <!-- 还在从 Supabase 拉取 top-K 时的占位提示 -->
+    <p v-if="loading" class="empty">加载中…</p>
+    <!-- 拉取完成但仍没有文章时的占位提示 -->
+    <p v-else-if="!front" class="empty">暂无文章</p>
 
     <!-- 有文章时才显示书架卡片区 -->
     <div v-else class="book">
@@ -129,6 +205,18 @@ function sideStyle(k: number) {
       <Transition name="page">
         <div class="card-pos" :key="front.post.url" :style="cardStyle(0)">
           <article class="card">
+            <!-- 右上角浏览量角标：小眼睛图标 + 格式化后的数字。
+                 formatCount 把大数字转成「1.2万」这种好读的样子。 -->
+            <span class="card-views">
+              <svg class="card-views-icon" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true">
+                <!-- 眼睛轮廓（一个扁椭圆）+ 中间的瞳孔（小圆） -->
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              {{ formatCount(front.post.count) }}
+            </span>
             <h3 class="card-title">
               <!-- 点标题跳转到文章详情页。
                    withBase() 给 url 补上 /CraftBlog/ 前缀，否则会 404。 -->
@@ -153,6 +241,16 @@ function sideStyle(k: number) {
         :style="sideStyle(item.k)"
       >
         <article class="card peek">
+          <!-- 侧卡右上角也显示浏览量角标（同样格式，只是更小一圈的效果由卡片缩小决定） -->
+          <span class="card-views">
+            <svg class="card-views-icon" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            {{ formatCount(item.post.count) }}
+          </span>
           <h3 class="card-title peek-title">{{ item.post.title }}</h3>
         </article>
       </div>
@@ -202,6 +300,7 @@ function sideStyle(k: number) {
 
 /* ========== 卡片本体：卡片长什么样 ========== */
 .card {
+  position: relative;    /* 相对定位：成为角标（绝对定位）的定位参照，角标钉在卡片自己的右上角 */
   width: 100%;           /* 宽度占满 .card-pos */
   height: 100%;          /* 高度占满 .card-pos */
   padding: 24px;         /* 内边距：文字和卡片边缘之间留 24px 空 */
@@ -210,6 +309,32 @@ function sideStyle(k: number) {
   background: var(--vp-c-bg-soft); /* 背景色用主题变量（柔和底色，深/浅色模式自动适配） */
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06); /* 阴影：下移4px/模糊14px/6%黑，制造悬浮感 */
   transition: transform 0.4s ease, opacity 0.4s ease; /* 位移和透明度都平滑过渡 */
+}
+
+/* ========== 右上角浏览量角标 ==========
+   位置：absolute + top/right 钉在卡片右上角（相对 .card，因为 .card 是 relative）。
+   样子：小药丸（圆角胶囊），浅色底 + 细描边，弱化存在感，不抢标题的注意力。 */
+.card-views {
+  position: absolute;    /* 绝对定位：脱离文档流，位置由 top/right 决定，相对最近的相对定位祖先（.card） */
+  top: 12px;             /* 距卡片上边 12px */
+  right: 12px;           /* 距卡片右边 12px */
+  display: inline-flex;  /* 弹性布局：让图标和数字并排 */
+  align-items: center;   /* 图标和文字垂直居中对齐 */
+  gap: 4px;              /* 图标和数字之间留 4px */
+  padding: 2px 10px;     /* 内边距：上 2 / 左右 10px，撑出药丸的样子 */
+  border: 1px solid var(--vp-c-divider); /* 1px 细描边（分隔线色），浅色模式下是淡灰 */
+  border-radius: 999px;  /* 大圆角：左右两边变成半圆 → 药丸形 */
+  background: var(--vp-c-bg);   /* 背景用页面底色（比卡片底浅一点，突出角标） */
+  font-size: 12px;       /* 小号字 */
+  font-weight: 500;      /* 字重 500（比正文略粗，稍醒目但不过分） */
+  line-height: 20px;     /* 行高 20px：和 2px 上下内边距一起凑出约 24px 的高度 */
+  color: var(--vp-c-text-2); /* 次要文字色（浅一点，弱化） */
+}
+
+/* 角标里的小眼睛图标：设成和文字一样大，让图标和数字融为一体 */
+.card-views-icon {
+  width: 14px;   /* 宽 14px */
+  height: 14px;  /* 高 14px（和宽一致，保持正方形比例） */
 }
 
 /* ========== 翻页进出场动画（配合模板里的 <Transition name="page">）==========

@@ -12,14 +12,8 @@ hero:
   text: ""
   # 标语/描述（hero 底部的灰色小字）
   tagline: ""
-  # 按钮区（可放多个按钮）
-  actions:
-    - theme: brand        # brand 主题：实心主色按钮
-      text: Markdown Examples   # 按钮文字
-      link: /markdown-examples   # 点击跳转的链接
-    - theme: alt          # alt 主题：描边/次要按钮
-      text: API Examples
-      link: /api-examples
+  # 说明：原本这里有两个按钮（Markdown Examples / API Examples），
+  # 已按用户要求移除，首页不再显示它们。
 
 # 注意：这里故意不写 features 配置。
 # 默认首页模板会在 hero 下方渲染 features 三栏卡片，会占掉一大块空间、

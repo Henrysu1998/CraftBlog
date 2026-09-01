@@ -1,3 +1,10 @@
+---
+# 这篇文章属于的分类。用 categories: 分类名 写单个分类，
+# 或用 categories: [分类A, 分类B] 写多个分类（方括号 + 逗号）。
+# 侧边栏和分类页会自动根据这里的内容生成。
+categories: [部署]
+---
+
 # VitePress初始化及GitHub Page部署教程
 
 

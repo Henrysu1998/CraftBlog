@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-09-01
+
+### 新增分类功能（文章分类体系）
+
+- 之前站点没有任何分类，侧边栏把 `docs/` 下所有文章平铺在一个「文章」分组里，首页也没有分类入口
+  - 手段：每篇文章的 frontmatter 加 `categories` 字段标记分类（支持单个 `categories: 教程` 和多个 `categories: [教程, 部署]` 两种写法，没写分类的文章自动归入「未分类」）；在共用工具文件 `docs/.vitepress/posts-utils.ts` 新增 `extractCategories()` 解析函数，侧边栏、分类页和首页标签用同一份解析规则，保证分类判断一致
+- **侧边栏改为按分类显示**：不再平铺文章，改为列出分类名称，点击分类名进入对应分类页
+  - 手段：重写 `config.mts` 的 `buildSidebar()`，扫描 `docs/*.md` 收集所有分类，返回 `[{ text: 分类名, link: '/categories/分类名' }]` 列表
+- **每个分类一个独立页面**（如 `/categories/教程`），列出该分类下的全部文章
+  - 手段：用 VitePress 动态路由，新增 `docs/categories/[category].md` 模板 + `docs/categories/[category].paths.ts`（扫描文章自动发现分类并生成页面）+ `CategoryPage.vue` 文章列表组件；用 `transformPageData` 把页面标题设成分类名，避免标题显示成 `{{ $params.category }}` 字面量
+- **首页底部分类标签**：在文章书架下方新增一排分类标签，显示分类名和文章数，点击进入对应分类页
+  - 手段：新增 `categories.data.ts`（用 `createContentLoader` 按分类聚合文章）+ `CategoryTags.vue`，在 `Layout.vue` 的 `home-features-after` 插槽中放在书架之后
+- 以后新增文章只需在 frontmatter 写 `categories`，无需改代码：分类页通过 `watch` 监听 `docs/*.md` 自动重新生成，侧边栏构建时自动刷新
+- 修复：分类页模板被当成普通文章混进首页书架
+  - 原因：`[category].md` 也会被 `createContentLoader('**/*.md')` 扫到，被当成文章卡片
+  - 手段：在 `theme/posts.data.ts` 的 `transform` 里过滤掉 `url` 以 `/categories/` 开头的页面
+- 修复：frontmatter 里的 `#` 注释被误读成文章标题
+  - 原因：`extractFirstHeading()` 用正则找第一个 `#` 标题时，把 frontmatter 配置块里以 `#` 开头的注释行也当成了标题
+  - 手段：匹配标题前先剥掉开头的 frontmatter 配置块
+
+### 移除首页 hero 按钮，分类标签改为按钮样式
+
+- 首页原本通过 hero.actions 配置有两个按钮（Markdown Examples / API Examples），用户要求去掉这两个按钮，并让底部分类标签复刻它们的按钮格式
+  - 手段：删除 `docs/index.md` 里的 `actions:` 配置；`Layout.vue` 移除 `<HeroActions />` 及其隐藏样式；删除不再使用的 `HeroActions.vue`
+  - 分类标签复刻 hero 按钮的「空心（alt）主题」格式并放大一档（big 尺寸）：重写 `CategoryTags.vue` 的样式，改为空心描边按钮（圆角 24px、高 46px、字号 16px、字重 600），去掉原来的 ↗ 图标和胶囊描边样式，只保留「分类名 + 文章数」
+- 验证：`docs:build` 构建通过，生成 `教程 / 示例 / 部署` 三个分类页；首页产物里两个 hero 按钮已消失、三个分类按钮带正确链接和计数
+
+---
+
 ## 2026-08-30
 
 ### 新增示例文章，让首页书架左右对称

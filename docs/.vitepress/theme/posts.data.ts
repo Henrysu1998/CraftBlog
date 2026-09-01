@@ -75,8 +75,10 @@ export default createContentLoader('**/*.md', {
   transform(raw) {
     return (
       raw
-        // 过滤掉首页。index.md 的 url 是 '/'，不放进文章列表。
-        .filter((page) => page.url !== '/')
+        // 过滤掉首页（index.md 的 url 是 '/'）和分类页（url 以 /categories/ 开头）。
+        // 分类页 [category].md 也会被这个加载器扫到，不排除的话会被当成普通文章
+        // 混进首页书架，导致书架里多出一张「分类页模板」卡片。
+        .filter((page) => page.url !== '/' && !page.url.startsWith('/categories/'))
         // 把每篇文章整理成 { title, url, date, excerpt, html } 结构。
         .map((page) => ({
           // 标题优先用 frontmatter 里写的 title；

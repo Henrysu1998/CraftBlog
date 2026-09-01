@@ -1,3 +1,8 @@
+---
+# 这篇文章属于的分类。categories: 分类名 写单个分类，[分类A, 分类B] 写多个。
+categories: 示例
+---
+
 # Markdown Extension Examples
 
 This page demonstrates some of the built-in markdown extensions provided by VitePress.
