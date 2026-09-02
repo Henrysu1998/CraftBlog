@@ -87,6 +87,14 @@ export default defineConfig({
     // 以后新增文章，不需要再手动维护这里的列表。
     sidebar: buildSidebar(),
 
+    // 文章/分类页底部「上一页/下一页」翻页条的标签文字。
+    // 默认主题显示英文 Previous page / Next page，
+    // 这里改成中文（大小写无关紧要，VitePress 直接使用这里的字符串）。
+    docFooter: {
+      prev: '上一页',
+      next: '下一页'
+    },
+
     // 右上角社交图标。icon 为内置图标名（github / twitter / discord 等），
     // link 为跳转地址
     socialLinks: [

@@ -60,4 +60,64 @@ const { Layout } = DefaultTheme
 .vp-doc li > ol > li::marker {
   color: var(--vp-c-text-3);   /* 次要文字色（比主文字色浅） */
 }
+
+/* ===== 覆盖默认主题：文章/分类页底部的「上一页/下一页」翻页条 =====
+   默认主题（VPDocFooter 组件）会把这两个链接做成「两张各占半行宽、
+   带 1px 方框的卡片」，还会在它们上方画一条贯穿整页的横向分隔线。
+   这里完全去掉方框和横线，只保留文字：
+     - 上一张贴最左、下一张贴最右（flex 两端对齐）；
+     - 窄屏放不下时自动换行上下堆叠。
+   注意：必须用「祖先 + 标签 + 类」这样更高优先级的选择器，
+   才能盖过 node_modules 里默认主题自带的 scoped 样式。 */
+
+/* 1) 容器：改成 flex，上一张贴左、下一张贴右；去掉贯穿整页的横向线 */
+.VPDocFooter nav.prev-next {
+  display: flex;                 /* 弹性布局：两个文字组横着排 */
+  justify-content: space-between;/* 上一页文字组贴左、下一页文字组贴右 */
+  flex-wrap: wrap;               /* 放不下时自动换行（窄屏变上下堆叠） */
+  column-gap: 16px;              /* 两组文字之间的最小间距 */
+  border-top: 0;                 /* 取消默认的 1px 贯穿横线 */
+  padding-top: 6px;              /* 补一点间距，别和上文贴太紧 */
+}
+
+/* 2) 每组文字的外层：宽度由内容决定 */
+.VPDocFooter .pager {
+  width: auto;
+}
+
+/* 3) 文字本体：彻底去掉方框，并把「上一页/下一页」小标签和分类名
+      放到同一行横排（flex），两者基线对齐、中间留小间距 */
+.VPDocFooter a.pager-link {
+  display: flex;                 /* 弹性布局：小标签和分类名横着排 */
+  align-items: baseline;         /* 两行文字按基线对齐（不会上下错位） */
+  column-gap: 8px;               /* 小标签（胶囊）和分类名之间的间距 */
+  width: auto;                   /* 不拉满整行 */
+  height: auto;                  /* 高度由内容决定 */
+  padding: 0;                    /* 不要内边距（没有框了） */
+  border: 0;                     /* 不要边框 */
+  background: transparent;       /* 不要背景 */
+  border-radius: 0;              /* 不需要圆角 */
+}
+
+/* 4) 给「上一页/下一页」这个小标签加一层「淡底胶囊」：
+      浅灰圆角底 + 无描边，文字仍小、颜色偏灰，不抢分类名的视觉。
+      分类名本身不加底、保持普通文字。 */
+.VPDocFooter a.pager-link .desc {
+  display: inline-flex;          /* 胶囊正好裹住文字，不占整行 */
+  align-items: center;           /* 文字在胶囊里垂直居中 */
+  padding: 1px 10px;             /* 左右 10px：让胶囊边缘离字远一点，圆角才明显 */
+  border-radius: 999px;          /* 超大圆角：左右两端变半圆 → 胶囊形 */
+  background: var(--vp-c-bg-soft); /* 浅灰底（主题变量，深浅色模式自动适配） */
+  color: var(--vp-c-text-2);     /* 字的颜色用次要文字色（浅灰） */
+  font-size: 14px;               /* 字号 = 分类名字号（.title 默认 14px），两边一样大 */
+  line-height: 20px;             /* 行高 20px：和分类名同一行高，胶囊高度也随之匹配 */
+  white-space: nowrap;           /* 不让「上一页」三个字断行 */
+}
+
+/* 5) 鼠标悬停整条翻页链接时，胶囊微亮成主题色，作为可点击的反馈
+      （去掉方框后没有任何反馈，补一个轻的） */
+.VPDocFooter a.pager-link:hover .desc {
+  background: var(--vp-c-brand-soft); /* 主题淡色底 */
+  color: var(--vp-c-brand);           /* 字变主题色 */
+}
 </style>
